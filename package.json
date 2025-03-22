@@ -1,0 +1,15 @@
+{
+  "name": "amazon-tv-scraper",
+  "version": "1.0.0",
+  "description": "A web scraper for Amazon India smart TV products",
+  "main": "amazonTvScraper.js",
+  "scripts": {
+    "start": "node amazonTvScraper.js"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "moment": "^2.30.1",
+    "puppeteer": "^24.4.0",
+    "user-agents": "^1.1.485"
+  }
+}
