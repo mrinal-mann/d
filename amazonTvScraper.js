@@ -82,6 +82,22 @@ class AmazonTVScraper {
         Connection: "keep-alive",
         "Upgrade-Insecure-Requests": "1",
         "Cache-Control": "max-age=0",
+        "sec-ch-ua":
+          '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"Windows"',
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+      });
+
+      // Add cookies handling
+      await this.page.setCookie({
+        name: "session-token",
+        value: "test-token",
+        domain: ".amazon.in",
+        path: "/",
       });
     } catch (error) {
       console.error("Error during setup:", error);
@@ -115,10 +131,13 @@ class AmazonTVScraper {
       const pageContent = await this.page.content();
       if (
         pageContent.includes("captcha") ||
-        pageContent.includes("security check")
+        pageContent.includes("security check") ||
+        pageContent.includes("Enter the characters you see below")
       ) {
         console.log("Detected security check or captcha");
-        return false;
+        throw new Error(
+          "Amazon security check detected. Please try again later."
+        );
       }
 
       // Log the page content for debugging
@@ -126,7 +145,7 @@ class AmazonTVScraper {
       return true;
     } catch (error) {
       console.error("Error loading page:", error);
-      return false;
+      throw error;
     }
   }
 
@@ -354,7 +373,7 @@ class AmazonTVScraper {
       const success = await this.getPageContent(url);
       if (!success) {
         console.log("Failed to load page content");
-        return null;
+        throw new Error("Failed to load product page");
       }
 
       const productData = {
@@ -373,11 +392,18 @@ class AmazonTVScraper {
         source_url: url,
       };
 
+      // Validate that we got at least some data
+      if (!productData.product_name && !productData.selling_price) {
+        throw new Error(
+          "Failed to extract product data. The page might have changed or is blocking access."
+        );
+      }
+
       console.log("Scraped data:", productData);
       return productData;
     } catch (error) {
       console.error("Error during scraping:", error);
-      return null;
+      throw error;
     }
   }
 
@@ -564,9 +590,17 @@ app.post("/scrape", async (req, res) => {
 
   try {
     const result = await handleScrapeRequest(url);
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
     res.json(result);
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    console.error("Server error:", error);
+    res.status(500).json({
+      success: false,
+      error:
+        "An error occurred while scraping the product. Please try again later.",
+    });
   }
 });
 
