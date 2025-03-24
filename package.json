@@ -7,8 +7,7 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "start": "node amazonTvScraper.js",
-    "postinstall": "node node_modules/puppeteer/install.js"
+    "start": "node amazonTvScraper.js"
   },
   "dependencies": {
     "cheerio": "^1.0.0",
