@@ -2,7 +2,9 @@ const puppeteer = require("puppeteer");
 const UserAgent = require("user-agents");
 const fs = require("fs").promises;
 const moment = require("moment");
-const readline = require("readline");
+const express = require("express");
+const app = express();
+const port = process.env.PORT || 3000;
 
 class AmazonTVScraper {
   constructor() {
@@ -276,46 +278,96 @@ class AmazonTVScraper {
   }
 }
 
-async function getUserInput(question) {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  return new Promise((resolve) => {
-    rl.question(question, (answer) => {
-      rl.close();
-      resolve(answer);
-    });
-  });
-}
-
-async function main() {
-  const url = await getUserInput("Enter Amazon India Smart TV product URL: ");
-
+// Add this new function to handle web requests
+async function handleScrapeRequest(url) {
   const scraper = new AmazonTVScraper();
   try {
     await scraper.setup();
-    console.log("Scraping product data...");
-
-    const productData = await scraper.scrapeTvProduct(url);
-    if (productData) {
-      const filename = await scraper.saveToJson(productData);
-      if (filename) {
-        console.log(`\nProduct data successfully saved to ${filename}`);
-      } else {
-        console.log("\nFailed to save product data");
-      }
-    } else {
-      console.log("\nFailed to scrape product data");
+    const data = await scraper.scrapeTvProduct(url);
+    if (data) {
+      const filename = `tv_product_${moment().format("YYYYMMDD_HHmmss")}.json`;
+      await scraper.saveToJson(data, filename);
+      return { success: true, data, filename };
     }
+    return { success: false, error: "Failed to scrape product data" };
   } catch (error) {
-    console.error("An error occurred:", error);
+    return { success: false, error: error.message };
   } finally {
     await scraper.close();
   }
 }
 
-if (require.main === module) {
-  main().catch(console.error);
-}
+// Add Express routes
+app.use(express.json());
+
+app.get("/", (req, res) => {
+  res.send(`
+    <html>
+      <head>
+        <title>Amazon TV Scraper</title>
+        <style>
+          body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+          .form-group { margin-bottom: 15px; }
+          input[type="text"] { width: 100%; padding: 8px; margin-top: 5px; }
+          button { padding: 10px 20px; background: #007bff; color: white; border: none; cursor: pointer; }
+          button:hover { background: #0056b3; }
+          #result { margin-top: 20px; white-space: pre-wrap; }
+        </style>
+      </head>
+      <body>
+        <h1>Amazon TV Scraper</h1>
+        <div class="form-group">
+          <label for="url">Enter Amazon India Smart TV product URL:</label>
+          <input type="text" id="url" placeholder="https://www.amazon.in/...">
+        </div>
+        <button onclick="scrapeProduct()">Scrape Product</button>
+        <div id="result"></div>
+
+        <script>
+          async function scrapeProduct() {
+            const url = document.getElementById('url').value;
+            if (!url) {
+              alert('Please enter a URL');
+              return;
+            }
+            
+            const result = document.getElementById('result');
+            result.textContent = 'Scraping in progress...';
+            
+            try {
+              const response = await fetch('/scrape', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url })
+              });
+              
+              const data = await response.json();
+              result.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+              result.textContent = 'Error: ' + error.message;
+            }
+          }
+        </script>
+      </body>
+    </html>
+  `);
+});
+
+app.post("/scrape", async (req, res) => {
+  const { url } = req.body;
+  if (!url) {
+    return res.status(400).json({ success: false, error: "URL is required" });
+  }
+
+  try {
+    const result = await handleScrapeRequest(url);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Start the server
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+});
