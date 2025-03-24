@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "A web scraper for Amazon India smart TV products",
   "main": "amazonTvScraper.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "start": "node amazonTvScraper.js"
   },
